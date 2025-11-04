@@ -2,14 +2,22 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import os 
+import elevation # 必須安裝
+import rasterio # 必須安裝
+
+# ----------------------------------------------------
+# 【修正】解決 elevation 函式庫在 Streamlit Cloud 上的快取寫入權限問題
+# ----------------------------------------------------
+# 設置 GDAL/elevation 快取目錄為 /tmp/，這是 Streamlit 允許寫入的位置
+os.environ['ELE_CACHE_DIR'] = '/tmp/ele_cache'
+os.environ['GDAL_CACHE_PATH'] = '/tmp/gdal_cache'
+# 確保臨時目錄存在
+os.makedirs(os.environ['ELE_CACHE_DIR'], exist_ok=True) 
 
 # ----------------------------------------------------
 # 程式設定
 # ----------------------------------------------------
-st.set_page_config(
-    page_title="小琉球 SRTM DEM 3D 模型", 
-    layout="wide",
-)
 
 # 小琉球 (琉球嶼) 的大致經緯度範圍 (WGS84)
 # [西經度, 南緯度, 東經度, 北緯度]
@@ -22,9 +30,6 @@ def download_and_process_dem(bounds, output_path):
     try:
         st.info("正在嘗試下載 SRTM 90m DEM 資料 (SRTM3)...")
         
-        # 1. 下載 SRTM 3 Arc-second (~90m) DEM 數據
-        # 注意：使用 SRTM3 數據，因為 SRTM1 (30m) 經常需要 Earthdata 授權才能下載。
-        import elevation
         elevation.clip(
             bounds=bounds, 
             output=output_path, 
@@ -32,21 +37,18 @@ def download_and_process_dem(bounds, output_path):
         )
         st.success(f"DEM 資料已下載到：{output_path}")
 
-        # 2. 讀取 GeoTIFF 檔案並轉換為網格數據
-        import rasterio
+        # 讀取 GeoTIFF 檔案並轉換為網格數據
         with rasterio.open(output_path) as src:
             Z_data = src.read(1) # 讀取高程數據 (Z)
             
-            # 替換無效值 (NoDataValue) 為 NaN
             if src.nodata is not None:
                 Z_data[Z_data == src.nodata] = np.nan
 
-            # 創建 X 和 Y 座標網格 (這就是 Plotly 需要的 X_grid, Y_grid)
-            # x_coords: 經度, y_coords: 緯度
+            # 創建 X 和 Y 座標網格
             x_coords = np.linspace(src.bounds.left, src.bounds.right, src.width)
             y_coords = np.linspace(src.bounds.bottom, src.bounds.top, src.height)
             
-            # 因為 Plotly 的 y 軸是從下到上，但 GeoTIFF 數據通常是從上到下，需要反轉 Z 數據和 Y 座標
+            # GeoTIFF 數據通常從上到下，Plotly 需要從下到上，故反轉
             Z_matrix = Z_data[::-1]
             Y_grid = y_coords[::-1] 
             X_grid = x_coords
@@ -58,7 +60,6 @@ def download_and_process_dem(bounds, output_path):
         return None, None, None
     except Exception as e:
         st.error(f"自動下載或處理 DEM 失敗。原因：{e}")
-        st.warning("如果錯誤與 'gdal' 相關，請確保部署環境中有安裝 GDAL 依賴。")
         return None, None, None
 
 def plot_3d_surface(Z_data, X_grid, Y_grid):
@@ -69,8 +70,7 @@ def plot_3d_surface(Z_data, X_grid, Y_grid):
             z=Z_data,
             x=X_grid,
             y=Y_grid,
-            colorscale='Topo', # 地形配色方案
-            # 設定等高線
+            colorscale='Topo',
             contours={
                 "z": {"show": True, "start": np.nanmin(Z_data), "end": np.nanmax(Z_data), "size": 10, "color":"white"}
             }
@@ -83,7 +83,6 @@ def plot_3d_surface(Z_data, X_grid, Y_grid):
             xaxis_title='經度 (X)',
             yaxis_title='緯度 (Y)',
             zaxis_title='高程 (Z) 公尺',
-            # 調整 Z 軸的比例，讓地形起伏更明顯
             aspectratio=dict(x=1, y=1.2, z=0.5), 
             aspectmode='manual',
             camera=dict(
@@ -99,12 +98,12 @@ def plot_3d_surface(Z_data, X_grid, Y_grid):
     return fig
 
 # ----------------------------------------------------
-# Streamlit 主程式
+# 頁面主程式 (頁面被選中時執行這裡的邏輯)
 # ----------------------------------------------------
 
 st.title("🏝️ 小琉球 DEM 互動式 3D 模型 (SRTM 90m)")
 
-# 1. 載入數據 (如果已經下載過，st.cache_data 會加速)
+# 1. 載入數據
 Z_data, X_grid, Y_grid = download_and_process_dem(XIAOLIUQIU_BOUNDS, OUTPUT_PATH)
 
 if Z_data is not None:
