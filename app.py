@@ -7,7 +7,8 @@ pages = [
     st.Page("page_3dmap-2.py", title="Plotly 3D Map", icon="ℹ️"),
     st.Page("page_3dmap-3.py", title="Plotly Map", icon="ℹ️"),
     st.Page("page_3dmap-4.py", title="Plotly ap", icon="ℹ️"),
-    st.Page("page_3dmap-5.py", title="Plotly p", icon="ℹ️")
+    st.Page("page_3dmap-5.py", title="Plotly p", icon="ℹ️"),
+    st.Page("page_3dmap-6.py", title="Plotly ", icon="ℹ️")
 ]
 
 # 2. 使用 st.navigation() 建立導覽
