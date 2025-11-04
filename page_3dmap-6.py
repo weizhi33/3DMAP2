@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 
-st.title("Plotly 真正的 3D 散点图 (X, Y, Z)")
+st.title("Plotly 3D 散點圖 (X, Y, Z)")
 
 # --- 1. 载入 Plotly 示例数据 ---
 # 筛选出 2007 年的数据
